@@ -862,9 +862,11 @@ function updateBaixaRow(i, field, val){
   else if(field==="vencimento" || field==="databaixa"){ const dt=brParts(val); if(dt) r[field]=dt; }
   else r[field] = val;
 }
-const BAIXA_HEADER = ["Número da Nota","CPF/CNPJ do Cliente","Data de Vencimento da Parcela","Data da Baixa da Parcela","Valor Recebido","Valor Juros","Valor Multa","Valor Desconto","Valor PIS","Valor COFINS","Valor CSLL","Valor IRRF"];
+const BAIXA_HEADER = ["Número da Nota","Série do Documento","CPF/CNPJ do Cliente","Data de Vencimento da Parcela","Data da Baixa da Parcela","Valor Recebido","Valor Juros","Valor Multa","Valor Desconto","Valor PIS","Valor COFINS","Valor CSLL","Valor IRRF"];
 function baixaRowArray(r){
-  return [r.numero, onlyDigits(r.cnpj), fmtDateBR(r.vencimento), fmtDateBR(r.databaixa), r.valor, 0,0,0,0,0,0,0];
+  // Série do Documento — coluna exigida pelo Domínio na baixa de serviços, logo após o
+  // Número da Nota; é sempre "U", não varia por cliente/nota.
+  return [r.numero, "U", onlyDigits(r.cnpj), fmtDateBR(r.vencimento), fmtDateBR(r.databaixa), r.valor, 0,0,0,0,0,0,0];
 }
 function onlyDigits(s){ return (s||"").toString().replace(/\D/g,""); }
 function downloadBaixaXlsx(){
@@ -879,7 +881,7 @@ function downloadBaixaTxt(){
   if(semCnpj.length){
     if(!confirm(`${semCnpj.length} linha(s) marcada(s) com CNPJ/CPF ausente ou inválido. Gerar mesmo assim (provavelmente rejeitadas pelo Domínio)?`)) return;
   }
-  const lines = incluidas.map(r=> baixaRowArray(r).map((v,i)=> i>=4 ? fmtValorTxt(v) : v).join(";"));
+  const lines = incluidas.map(r=> baixaRowArray(r).map((v,i)=> i>=5 ? fmtValorTxt(v) : v).join(";"));
   downloadText("baixa_ser.txt", lines.join("\r\n") + "\r\n");
 }
 function downloadText(filename, content, mime){
