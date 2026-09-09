@@ -117,7 +117,7 @@ code{background:var(--paper);padding:1px 5px;border-radius:3px;font-family:'IBM 
   <div class="topbar">
     <div class="brand">
       <h1>Lançamentos Agenor</h1>
-      <div class="sub">Lê o extrato bancário Sicredi da <b>Agenor Daufenbach Junior Advogados Associados</b> e gera os lançamentos contábeis pro Domínio — honorários da Cricon, integralização de capital, aplicação/resgate de fundos, custas processuais TJSC e distribuições de lucro aos sócios. Recebimentos de cliente (notas de serviço) não entram aqui — geram baixa na ferramenta <a href="https://criconcontabilidade.github.io/Baixas-Parcelas/" target="_blank">Baixas de Parcelas</a>, que já lê essa empresa sozinha. Tudo roda 100% local no navegador.</div>
+      <div class="sub">Lê o extrato bancário Sicredi da <b>Agenor Daufenbach Junior Advogados Associados</b> e gera os lançamentos contábeis pro Domínio — honorários da Cricon, integralização de capital, aplicação/resgate de fundos, custas processuais TJSC e distribuições de lucro aos sócios — e, se você soltar também o Contas a Receber por Cliente, gera a baixa de notas de serviço (baixa_ser.txt) dos recebimentos do mês. Tudo roda 100% local no navegador.</div>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
       <a class="backlink" href="https://criconcontabilidade.github.io/Cricon-Ferramentas/" onclick="window.close(); setTimeout(function(){ location.href='https://criconcontabilidade.github.io/Cricon-Ferramentas/'; }, 250); return false;">← Hub de Ferramentas</a>
@@ -139,6 +139,11 @@ code{background:var(--paper);padding:1px 5px;border-radius:3px;font-family:'IBM 
     <div class="dropzone" id="aplicDrop"><div class="big">Arraste o extrato de aplicação/resgate Sicredi aqui</div><div class="small">"Extrato de aplicação - SICREDI TAXA SELIC..." — o mesmo baixado no Internet Banking Sicredi</div><input type="file" id="aplicFile" accept="application/pdf"></div>
     <div id="aplicStatus" class="status-line hidden"></div>
 
+    <div class="section-title" style="margin-top:18px;">3. Contas a Receber por Cliente (PDF) — opcional, gera a baixa de serviços</div>
+    <div class="help">Casa cada recebimento do extrato bancário (TED/PIX de cliente, honorários) com o título "Aberta" de mesmo valor nesse relatório e resolve o CNPJ do cliente pelo cadastro compartilhado com a Conversões Cibele/Baixas de Parcelas <span id="cloudStatus" class="badge info">Conectando…</span>. Sem esse relatório, os recebimentos só aparecem listados pra você gerar a baixa manualmente na ferramenta Baixas de Parcelas.</div>
+    <div class="dropzone" id="receberDrop"><div class="big">Arraste o Contas a Receber por Cliente (PDF) aqui</div><input type="file" id="receberFile" accept="application/pdf"></div>
+    <div id="receberStatus" class="status-line hidden"></div>
+
     <div class="field-row" style="margin-top:16px;">
       <div class="field"><label>Código Emp. (Domínio)</label><input id="lancCodEmp" value="220" readonly style="background:var(--paper);color:var(--ink-soft);"></div>
     </div>
@@ -147,6 +152,7 @@ code{background:var(--paper);padding:1px 5px;border-radius:3px;font-family:'IBM 
 
   <!-- ===================== RESULTADO ===================== -->
   <div class="card hidden" id="resultCard"></div>
+  <div class="card hidden" id="baixaCard"></div>
   <div class="card hidden" id="recebimentosCard"></div>
 
   <!-- ===================== CADASTRO DE PADRÕES ===================== -->
@@ -315,6 +321,116 @@ async function parseExtratoSicredi(file){
     });
   });
   return linhas;
+}
+
+/* =========================================================================
+   CONTAS A RECEBER POR CLIENTE (PDF do Domínio) — pra casar os recebimentos
+   do extrato bancário e gerar a baixa de serviços (mesmo layout/parser já
+   validado na Baixas de Parcelas).
+   ========================================================================= */
+const EMPRESA_RE = /^Empresa:\s*(.+?)\s+P.gina/i;
+const CNPJ_HEADER_RE = /CNPJ:\s*([\d.\/-]{14,18})/;
+const GROUP_RE = /^(Cliente|Fornecedor):\s*(\d+)\s*-\s*(.+)$/;
+const TITULO_RE = /^(\S+)\s+(\d{2}\/\d{2}\/\d{4})\s+\d{2}\/\d{2}\/\d{4}\s+(\d{2}\/\d{2}\/\d{4})\s+([\d.,]+)\s+([\d.,]+)\s+[\d.,]+\s+[\d.,]+\s+[\d.,]+\s+[\d.,]+\s+[\d.,]+\s+([\d.,]+)\s*(Aberta|Parcial|Baixada|Recebida|Paga)$/;
+async function parseContasReceber(file){
+  const pages = await extractPdfAllLines(file);
+  const allLines = pages.flat();
+  const fullText = allLines.join("\n");
+  let empresaNome = null, empresaCnpj = null;
+  const em = fullText.match(EMPRESA_RE); if(em) empresaNome = em[1].trim();
+  const cm = fullText.match(CNPJ_HEADER_RE); if(cm) empresaCnpj = cm[1];
+  const titulos = [];
+  let nomeParceiro = null;
+  allLines.forEach(line=>{
+    const gm = line.match(GROUP_RE);
+    if(gm){ nomeParceiro = gm[3].trim(); return; }
+    if(/^Sub Total/i.test(line) || /^Total Geral/i.test(line) || /^Documento/i.test(line)) return;
+    const tm = line.match(TITULO_RE);
+    if(tm && nomeParceiro!=null){
+      titulos.push({
+        nome: nomeParceiro, documento: tm[1],
+        // tm[2] é Emissão e tm[3] é Vencimento na ordem das colunas do relatório
+        // (Documento/Emissão/Saída/Vencimento) — usar o índice errado aqui compara a data
+        // errada no casamento e grava a data errada na coluna "Vencimento" do TXT exportado.
+        vencimento: brParts(tm[3]),
+        valorParcela: parseBRL(tm[4]), valorBaixado: parseBRL(tm[5]), saldo: parseBRL(tm[6]),
+        situacao: tm[7],
+      });
+    }
+  });
+  if(!titulos.length) throw new Error("Não encontrei nenhum título nesse relatório.");
+  return {empresaNome, empresaCnpj, titulos};
+}
+
+/* ---- Cadastro de CNPJ compartilhado (mesma nuvem da Conversões Cibele/Baixas de Parcelas) ---- */
+function loadClientes(){ const raw = localStorage.getItem("cibele_clientes_fornecedores"); return raw ? JSON.parse(raw) : {}; }
+function saveClientes(db){ localStorage.setItem("cibele_clientes_fornecedores", JSON.stringify(db)); }
+let clientesDB = loadClientes();
+function setClientesDB(db){ clientesDB = db; window.clientesDB = db; saveClientes(db); }
+window.clientesDB = clientesDB;
+// "Cliente Padrão" é um nome genérico que o Domínio usa pra venda avulsa/cliente não
+// cadastrado — não é uma identidade de verdade, então NUNCA tenta casar por nome aproximado
+// (senão uma palavra comum feito "CLIENTE" bate por substring com qualquer "CLIENTES..." do
+// cadastro e resolve um CNPJ errado — bug real encontrado testando com dados de produção).
+function isNomeGenerico(nome){
+  const norm = normalizeText(nome);
+  return /^CLIENTES?\s+PADR[AÃ]O$/.test(norm) || norm.trim()==="";
+}
+function findBestMatch(nome, db){
+  if(isNomeGenerico(nome)) return null;
+  const norm = normalizeText(nome);
+  // Palavras curtas/genéricas (CLIENTE, LTDA, DE, DA...) não identificam ninguém sozinhas —
+  // exigir 4+ letras reduz falso-positivo por substring (ex. "CLIENTE" dentro de "CLIENTES").
+  const words = norm.split(/\s+/).filter(w=>w.length>=4);
+  const candidatos = [];
+  Object.keys(db).forEach(key=>{
+    const c = db[key];
+    const cn = normalizeText(c.razao_social);
+    const contido = cn.includes(norm) || norm.includes(cn);
+    const wordsBatidas = words.filter(w=>cn.includes(w)).length;
+    // Um nome de razão social batendo inteiro é forte o bastante sozinho; senão, exige pelo
+    // menos DUAS palavras em comum — um sobrenome comum isolado (ex. "SOUZA") não identifica
+    // ninguém e já gerou falso-positivo com dado real (baixa pro CNPJ de outro cliente).
+    if(contido || wordsBatidas>=2) candidatos.push({key, c, score: (contido?10:0)+wordsBatidas});
+  });
+  if(!candidatos.length) return null;
+  candidatos.sort((a,b)=>b.score-a.score);
+  // Empate no topo entre clientes diferentes = ambíguo, melhor não adivinhar.
+  if(candidatos.length>1 && candidatos[1].score===candidatos[0].score) return null;
+  return {documento:candidatos[0].key, nome:candidatos[0].c.razao_social};
+}
+
+/* ---- Casamento: cada recebimento do extrato x título "Aberta"/"Parcial" de mesmo valor ---- */
+function matchRecebimentos(recebimentos, titulos){
+  const abertos = titulos
+    .filter(t=>{ const s=normalizeText(t.situacao); return s.startsWith("ABERT") || s.startsWith("PARCIAL"); })
+    .map(t=> ({...t, valorEfetivo: normalizeText(t.situacao).startsWith("PARCIAL") ? t.saldo : t.valorParcela, _usado:false}));
+  const rows = [];
+  recebimentos.forEach(l=>{
+    const cents = Math.round(l.valor*100);
+    let candidatos = abertos.filter(t=>!t._usado && Math.round(t.valorEfetivo*100)===cents);
+    if(candidatos.length>1){
+      candidatos = candidatos.slice().sort((a,b)=> Math.abs(partsToDate(a.vencimento)-partsToDate(l.data)) - Math.abs(partsToDate(b.vencimento)-partsToDate(l.data)));
+    }
+    const titulo = candidatos[0];
+    if(titulo){
+      titulo._usado = true;
+      const generico = isNomeGenerico(titulo.nome);
+      const cnpjInfo = generico ? null : findBestMatch(titulo.nome, clientesDB);
+      rows.push({
+        numero: titulo.documento, cnpj: cnpjInfo?cnpjInfo.documento:"", nomeCliente: cnpjInfo?cnpjInfo.nome:titulo.nome,
+        vencimento: titulo.vencimento, databaixa: l.data, valor: titulo.valorEfetivo,
+        incluir: !!cnpjInfo, statusText: cnpjInfo ? "OK" : (generico ? "\"Cliente Padrão\" (genérico) — descubra e preencha o CNPJ/CPF real a mão" : "CNPJ não encontrado no cadastro — complete a mão"),
+      });
+    } else {
+      rows.push({
+        numero:"", cnpj:"", nomeCliente:l.historico, vencimento:null, databaixa:l.data, valor:l.valor,
+        incluir:false, statusText:"Recebimento sem título \"Aberta\" de mesmo valor no Contas a Receber — confira manualmente",
+      });
+    }
+  });
+  const semCorrespondencia = abertos.filter(t=>!t._usado);
+  return {rows, semCorrespondencia};
 }
 
 /* =========================================================================
@@ -523,6 +639,20 @@ wireDropzone("aplicDrop","aplicFile", async (f,d)=>{
   }
 });
 
+let contasReceberState = null;
+wireDropzone("receberDrop","receberFile", async (f,d)=>{
+  const status = document.getElementById("receberStatus");
+  status.classList.remove("hidden","err"); status.textContent = "Lendo PDF...";
+  try{
+    contasReceberState = await parseContasReceber(f);
+    markDropDone(d, `${f.name} (${contasReceberState.titulos.length} título(s))`);
+    status.classList.add("hidden");
+  }catch(err){
+    status.classList.remove("hidden"); status.classList.add("err"); status.textContent = "Erro: " + err.message;
+    contasReceberState = null;
+  }
+});
+
 let lancRowsState = [];
 let recebimentosState = [];
 function processarLancamentos(){
@@ -573,7 +703,15 @@ function processarLancamentos(){
   lancRowsState = rows;
   recebimentosState = recebimentos;
   renderLancResult(rows, excluidas);
-  renderRecebimentos(recebimentos);
+  if(contasReceberState){
+    const {rows:baixaRows, semCorrespondencia} = matchRecebimentos(recebimentos, contasReceberState.titulos);
+    baixaRowsState = baixaRows;
+    renderBaixaResult(baixaRows, semCorrespondencia);
+    document.getElementById("recebimentosCard").classList.add("hidden");
+  } else {
+    document.getElementById("baixaCard").classList.add("hidden");
+    renderRecebimentos(recebimentos);
+  }
 }
 
 let lancTableState = makeTableState();
@@ -652,7 +790,7 @@ function renderRecebimentos(recebimentos){
   if(!recebimentos.length){ box.classList.add("hidden"); box.innerHTML = ""; return; }
   box.classList.remove("hidden");
   let html = `<div class="section-title">Recebimentos identificados (${recebimentos.length}) — não entram nesse arquivo</div>
-  <div class="help">Créditos no extrato que não bateram com nenhum padrão cadastrado — normalmente são recebimentos de nota de serviço/honorários de cliente. Gere a baixa deles na ferramenta <a href="https://criconcontabilidade.github.io/Baixas-Parcelas/" target="_blank">Baixas de Parcelas</a> (modelo "Serviços"), que lê o Contas a Receber e o mesmo extrato sozinha.</div>
+  <div class="help">Créditos no extrato que não bateram com nenhum padrão cadastrado — normalmente são recebimentos de nota de serviço/honorários de cliente. Solte também o PDF do <b>Contas a Receber por Cliente</b> (passo 3 acima) e reprocesse pra gerar a baixa_ser.txt direto aqui; sem ele, gere na ferramenta <a href="https://criconcontabilidade.github.io/Baixas-Parcelas/" target="_blank">Baixas de Parcelas</a> (modelo "Serviços").</div>
   <div class="table-wrap"><table class="preview"><thead><tr><th>Data</th><th>Histórico</th><th>Valor</th></tr></thead><tbody>`;
   recebimentos.forEach(l=>{
     html += `<tr class="info"><td>${fmtDateBR(l.data)}</td><td>${l.historico}</td><td class="num">${fmtBRL(l.valor)}</td></tr>`;
@@ -661,7 +799,134 @@ function renderRecebimentos(recebimentos){
   box.innerHTML = html;
 }
 
+/* =========================================================================
+   BAIXA DE SERVIÇOS — gerada a partir dos recebimentos do extrato x Contas
+   a Receber por Cliente. Mesmo layout "Serviços" (12 colunas) já validado
+   na ferramenta Baixas de Parcelas.
+   ========================================================================= */
+let baixaRowsState = [];
+let baixaTableState = makeTableState();
+function renderBaixaResult(rows, semCorrespondencia){
+  document.getElementById("recebimentosCard").classList.add("hidden");
+  document.getElementById("baixaCard").classList.remove("hidden");
+  baixaTableState = makeTableState();
+  window.__baixaSemCorrespondencia = semCorrespondencia||[];
+  renderBaixaTable();
+}
+function renderBaixaTable(){
+  const box = document.getElementById("baixaCard");
+  const rows = baixaRowsState;
+  const nOk = rows.filter(r=>r.incluir).length;
+  const sem = window.__baixaSemCorrespondencia||[];
+  const indexed = filterSortRows(rows, baixaTableState, r=>[r.numero,r.cnpj,r.nomeCliente]);
+  let html = `<div class="section-title">Baixa de Serviços — baixa_ser.txt</div>
+  <div class="summary-row">
+    <div class="item"><div class="k">Recebimentos</div><div class="v">${rows.length}</div></div>
+    <div class="item"><div class="k">Prontos pra incluir</div><div class="v">${nOk}</div></div>
+    <div class="item"><div class="k">Títulos "Aberta" sem recebimento no extrato</div><div class="v">${sem.length}</div></div>
+  </div>
+  <div class="help">Linhas em amarelo faltam CNPJ (cadastre o cliente na ferramenta Cadastro de Clientes/Fornecedores) ou não bateram com nenhum título "Aberta" de mesmo valor — confira e complete/desmarque antes de exportar.</div>
+  <div class="table-toolbar"><input type="search" value="${baixaTableState.filter}" placeholder="Filtrar..." oninput="baixaTableState.filter=this.value; renderBaixaTable();"><span class="count">${indexed.length===rows.length?`${rows.length} linha(s)`:`${indexed.length} de ${rows.length}`}</span></div>
+  <div class="table-wrap"><table class="preview"><thead><tr>
+    <th>Incluir</th><th>Nº Título</th><th>CNPJ/CPF Cliente</th><th>Cliente</th><th>Vencimento</th><th>Data Baixa</th><th>Valor</th><th>Status</th>
+  </tr></thead><tbody>`;
+  indexed.forEach(({row:r, idx:i})=>{
+    html += `<tr class="${r.incluir?'':'flag'}">
+      <td style="text-align:center"><input type="checkbox" ${r.incluir?'checked':''} onchange="updateBaixaRow(${i},'incluir',this.checked)"></td>
+      <td class="cell"><input class="cell-input" value="${r.numero||''}" onchange="updateBaixaRow(${i},'numero',this.value)"></td>
+      <td class="cell"><input class="cell-input" value="${r.cnpj||''}" onchange="updateBaixaRow(${i},'cnpj',this.value)"></td>
+      <td class="cell"><input class="cell-input wide" value="${r.nomeCliente||''}" onchange="updateBaixaRow(${i},'nomeCliente',this.value)"></td>
+      <td class="cell"><input class="cell-input" value="${fmtDateBR(r.vencimento)}" onchange="updateBaixaRow(${i},'vencimento',this.value)"></td>
+      <td class="cell"><input class="cell-input" value="${fmtDateBR(r.databaixa)}" onchange="updateBaixaRow(${i},'databaixa',this.value)"></td>
+      <td class="cell"><input class="cell-input num" value="${fmtBRL(r.valor)}" onchange="updateBaixaRow(${i},'valor',this.value)"></td>
+      <td>${r.statusText||''}</td>
+    </tr>`;
+  });
+  html += `</tbody></table></div>
+  <div class="btn-row">
+    <button class="btn" onclick="downloadBaixaXlsx()">Baixar baixa_servicos.xlsx</button>
+    <button class="btn ghost" onclick="downloadBaixaTxt()">Baixar baixa_ser.txt</button>
+  </div>`;
+  box.innerHTML = html;
+}
+function updateBaixaRow(i, field, val){
+  const r = baixaRowsState[i];
+  if(field==="incluir") r.incluir = val;
+  else if(field==="valor"){ const n=parseBRL(val); if(n!=null) r.valor=n; }
+  else if(field==="vencimento" || field==="databaixa"){ const dt=brParts(val); if(dt) r[field]=dt; }
+  else r[field] = val;
+}
+const BAIXA_HEADER = ["Número da Nota","CPF/CNPJ do Cliente","Data de Vencimento da Parcela","Data da Baixa da Parcela","Valor Recebido","Valor Juros","Valor Multa","Valor Desconto","Valor PIS","Valor COFINS","Valor CSLL","Valor IRRF"];
+function baixaRowArray(r){
+  return [r.numero, onlyDigits(r.cnpj), fmtDateBR(r.vencimento), fmtDateBR(r.databaixa), r.valor, 0,0,0,0,0,0,0];
+}
+function onlyDigits(s){ return (s||"").toString().replace(/\D/g,""); }
+function downloadBaixaXlsx(){
+  const incluidas = baixaRowsState.filter(r=>r.incluir);
+  if(!incluidas.length){ alert("Nenhuma linha marcada pra incluir."); return; }
+  downloadXlsx("baixa_servicos.xlsx", [BAIXA_HEADER, ...incluidas.map(baixaRowArray)], "Baixa");
+}
+function downloadBaixaTxt(){
+  const incluidas = baixaRowsState.filter(r=>r.incluir);
+  if(!incluidas.length){ alert("Nenhuma linha marcada pra incluir."); return; }
+  const semCnpj = incluidas.filter(r=> onlyDigits(r.cnpj).length!==11 && onlyDigits(r.cnpj).length!==14);
+  if(semCnpj.length){
+    if(!confirm(`${semCnpj.length} linha(s) marcada(s) com CNPJ/CPF ausente ou inválido. Gerar mesmo assim (provavelmente rejeitadas pelo Domínio)?`)) return;
+  }
+  const lines = incluidas.map(r=> baixaRowArray(r).map((v,i)=> i>=4 ? fmtValorTxt(v) : v).join(";"));
+  downloadText("baixa_ser.txt", lines.join("\r\n") + "\r\n");
+}
+function downloadText(filename, content, mime){
+  const blob = new Blob([content], {type: mime||"text/plain;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
 renderPadroesTable();
+</script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+
+// Mesmo projeto Firebase e mesma collection "clientes" que a Conversões Cibele e a Baixas de
+// Parcelas já usam — só LEITURA aqui (essa ferramenta não cadastra cliente novo, só resolve o
+// CNPJ pra baixa de serviços; cadastro fica a cargo das outras ferramentas do escritório).
+const firebaseConfig = {
+  apiKey: "AIzaSyCBIQkYYNt3K4gZ0OGqoqsU8Jnrsgxif5k",
+  authDomain: "conversoes-cibele.firebaseapp.com",
+  projectId: "conversoes-cibele",
+  storageBucket: "conversoes-cibele.firebasestorage.app",
+  messagingSenderId: "401784315449",
+  appId: "1:401784315449:web:5d459a524059c0978bb7e8"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+function setCloudBadge(text, cls){
+  const el = document.getElementById("cloudStatus");
+  if(!el) return;
+  el.textContent = text; el.className = "badge " + (cls||"info");
+}
+setCloudBadge("Conectando à nuvem…", "warn");
+signInAnonymously(auth).catch(err=>{
+  console.error("Firebase auth error", err);
+  setCloudBadge("Nuvem indisponível — usando só o cadastro deste navegador", "err");
+});
+onAuthStateChanged(auth, (user)=>{
+  if(!user) return;
+  onSnapshot(collection(db, "clientes"), (snap)=>{
+    const cloudData = {};
+    snap.forEach(d=> cloudData[d.id] = d.data());
+    window.setClientesDB ? window.setClientesDB(cloudData) : (window.clientesDB = cloudData);
+    setCloudBadge("Sincronizado com a nuvem", "ok");
+  }, err=>{ console.error("clientes onSnapshot", err); setCloudBadge("Erro de sincronização", "err"); });
+});
 </script>
 </body>
 </html>
