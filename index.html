@@ -376,6 +376,11 @@ function isNomeGenerico(nome){
   const norm = normalizeText(nome);
   return /^CLIENTES?\s+PADR[AÃ]O$/.test(norm) || norm.trim()==="";
 }
+// "Cliente Padrão" (código 001 no cadastro de Clientes do Domínio) não tem CNPJ/CPF de
+// verdade — o Tipo de Inscrição dele é "Outros", com esse número na Insc. Estadual. A
+// importação de baixa do Domínio casa pelo número cadastrado no código do cliente, não pelo
+// tipo de inscrição, então esse número pré-preenche a baixa; troque na tabela se mudar.
+const CLIENTE_PADRAO_INSCRICAO = "27857407000196";
 function findBestMatch(nome, db){
   if(isNomeGenerico(nome)) return null;
   const norm = normalizeText(nome);
@@ -417,10 +422,11 @@ function matchRecebimentos(recebimentos, titulos){
       titulo._usado = true;
       const generico = isNomeGenerico(titulo.nome);
       const cnpjInfo = generico ? null : findBestMatch(titulo.nome, clientesDB);
+      const cnpj = cnpjInfo ? cnpjInfo.documento : (generico ? CLIENTE_PADRAO_INSCRICAO : "");
       rows.push({
-        numero: titulo.documento, cnpj: cnpjInfo?cnpjInfo.documento:"", nomeCliente: cnpjInfo?cnpjInfo.nome:titulo.nome,
+        numero: titulo.documento, cnpj, nomeCliente: cnpjInfo?cnpjInfo.nome:titulo.nome,
         vencimento: titulo.vencimento, databaixa: l.data, valor: titulo.valorEfetivo,
-        incluir: !!cnpjInfo, statusText: cnpjInfo ? "OK" : (generico ? "\"Cliente Padrão\" (genérico) — descubra e preencha o CNPJ/CPF real a mão" : "CNPJ não encontrado no cadastro — complete a mão"),
+        incluir: !!cnpj, statusText: cnpjInfo ? "OK" : (generico ? "\"Cliente Padrão\" — pré-preenchido com a inscrição cadastrada no Domínio; troque aqui se for outro cliente" : "CNPJ não encontrado no cadastro — complete a mão"),
       });
     } else {
       rows.push({
