@@ -133,6 +133,12 @@ code{background:var(--paper);padding:1px 5px;border-radius:3px;font-family:'IBM 
     <div class="section-title">1. Extrato bancário Sicredi (PDF)</div>
     <div class="dropzone" id="extratoDrop"><div class="big">Arraste o extrato bancário do mês aqui</div><div class="small">Internet Banking Sicredi — conta corrente 42799-3</div><input type="file" id="extratoFile" accept="application/pdf"></div>
     <div id="extratoStatus" class="status-line hidden"></div>
+
+    <div class="section-title" style="margin-top:18px;">2. Extrato de Aplicação Financeira (PDF) — opcional</div>
+    <div class="help">Sem esse extrato, o IRRF do resgate é perguntado na hora (a ferramenta não sabe o valor sozinha) e o rendimento do período não é lançado. Com ele, os dois saem automáticos: o IRRF do resgate é lido do Resumo da Movimentação, e é gerado um lançamento a mais — D9 C395, "Rendimento de Aplicação Financeira" do mês, datado no último dia útil — que não aparece no extrato bancário (não mexe na conta corrente).</div>
+    <div class="dropzone" id="aplicDrop"><div class="big">Arraste o extrato de aplicação/resgate Sicredi aqui</div><div class="small">"Extrato de aplicação - SICREDI TAXA SELIC..." — o mesmo baixado no Internet Banking Sicredi</div><input type="file" id="aplicFile" accept="application/pdf"></div>
+    <div id="aplicStatus" class="status-line hidden"></div>
+
     <div class="field-row" style="margin-top:16px;">
       <div class="field"><label>Código Emp. (Domínio)</label><input id="lancCodEmp" value="220" readonly style="background:var(--paper);color:var(--ink-soft);"></div>
     </div>
@@ -426,22 +432,60 @@ function matchPadrao(l){
 }
 
 /* =========================================================================
+   EXTRATO DE APLICAÇÃO FINANCEIRA (Sicredi) — opcional. Traz dois dados que
+   NÃO estão no extrato bancário: o IRRF total do período (Resumo da
+   Movimentação) e o Rendimento do Período (usado no lançamento mensal de
+   rendimento, que não passa pela conta corrente).
+   ========================================================================= */
+async function parseExtratoAplicacao(file){
+  const pages = await extractPdfAllLines(file);
+  const allLines = pages.flat();
+  const fullText = allLines.join("\n");
+  const rendMatch = fullText.match(/Rendimentos Per.odo\s+(-?\d{1,3}(?:\.\d{3})*,\d{2})/i);
+  const irrfMatch = fullText.match(/(?:^|\n)IRRF\s+(-?\d{1,3}(?:\.\d{3})*,\d{2})/i);
+  const saldoAtualMatch = fullText.match(/(\d{2})\/(\d{2})\/(\d{4})\s+SALDO ATUAL/i);
+  if(!rendMatch && !irrfMatch) throw new Error("Não achei \"Rendimentos Período\"/\"IRRF\" nesse PDF — confira se é o extrato de aplicação financeira certo.");
+  return {
+    rendimento: rendMatch ? parseBRL(rendMatch[1]) : null,
+    totalIrrf: irrfMatch ? Math.abs(parseBRL(irrfMatch[1])) : null,
+    dataSaldoAtual: saldoAtualMatch ? {d:+saldoAtualMatch[1], m:+saldoAtualMatch[2], y:+saldoAtualMatch[3]} : null,
+  };
+}
+// Último dia útil do mês (segunda a sexta) — o rendimento do período é sempre lançado nele.
+function ultimoDiaUtil(y, m){
+  const ultimoDiaCalendario = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const dt = new Date(Date.UTC(y, m-1, ultimoDiaCalendario));
+  while(dt.getUTCDay()===0 || dt.getUTCDay()===6) dt.setUTCDate(dt.getUTCDate()-1);
+  return {y:dt.getUTCFullYear(), m:dt.getUTCMonth()+1, d:dt.getUTCDate()};
+}
+
+/* =========================================================================
    RESGATE DE APLICAÇÃO FINANCEIRA — lançamento de partidas múltiplas:
      D 7   VALOR REF. RESGATE DE APLICAÇÃO FINANCEIRA - SICREDI   (valor líquido no extrato)
-     D 385 VALOR REF. IRRF SOBRE RESGATE DE APLICAÇÃO FINANCEIRA  (varia todo mês — pergunta na hora)
+     D 385 VALOR REF. IRRF SOBRE RESGATE DE APLICAÇÃO FINANCEIRA  (varia todo mês)
      C 9   VALOR REF. RESGATE DE APLICAÇÃO FINANCEIRA - SICREDI   (soma dos dois débitos)
+   O IRRF vem do extrato de aplicação financeira (Resumo da Movimentação) quando ele foi
+   importado e só há UM resgate no mês — só nesse caso dá pra saber, sem ambiguidade, que o
+   IRRF do período inteiro pertence a esse resgate. Fora isso, pergunta na hora.
    ========================================================================= */
 function isResgate(l){ return normalizeText(l.historico).includes("RESGATE APLIC"); }
-function buildResgateEntries(l){
+function buildResgateEntries(l, irrfAutomatico){
   const bancoVal = l.valor;
-  const irrfStr = window.prompt(`Resgate de aplicação financeira em ${fmtDateBR(l.data)}, valor líquido R$ ${fmtBRL(bancoVal)}.\n\nQual o IRRF sobre esse resgate (ver extrato de aplicação/resgate Sicredi)? Deixe 0 se não houver.`, "0");
-  const irrfVal = Math.round((parseBRL(irrfStr) || 0)*100)/100;
+  let irrfVal, statusIrrf;
+  if(irrfAutomatico != null){
+    irrfVal = Math.round(irrfAutomatico*100)/100;
+    statusIrrf = "OK (IRRF lido do extrato de aplicação financeira)";
+  } else {
+    const irrfStr = window.prompt(`Resgate de aplicação financeira em ${fmtDateBR(l.data)}, valor líquido R$ ${fmtBRL(bancoVal)}.\n\nQual o IRRF sobre esse resgate (ver extrato de aplicação/resgate Sicredi)? Deixe 0 se não houver.`, "0");
+    irrfVal = Math.round((parseBRL(irrfStr) || 0)*100)/100;
+    statusIrrf = irrfVal===0 ? "Confira se realmente não houve IRRF nesse resgate" : "OK (resgate de aplicação — IRRF informado na hora)";
+  }
   const total = Math.round((bancoVal + irrfVal)*100)/100;
   const histBanco = "VALOR REF. RESGATE DE APLICAÇÃO FINANCEIRA - SICREDI";
   const histIrrf = "VALOR REF. IRRF SOBRE RESGATE DE APLICAÇÃO FINANCEIRA - SICREDI";
   return [
     {debito:CONTA_BANCO, credito:null, valor:bancoVal, hist:histBanco, iniciaLote:1, flag:false, statusText:"OK (resgate de aplicação — perna do banco)"},
-    {debito:385, credito:null, valor:irrfVal, hist:histIrrf, iniciaLote:null, flag:irrfVal===0, statusText: irrfVal===0 ? "Confira se realmente não houve IRRF nesse resgate" : "OK (resgate de aplicação — IRRF)"},
+    {debito:385, credito:null, valor:irrfVal, hist:histIrrf, iniciaLote:null, flag:irrfAutomatico==null && irrfVal===0, statusText:statusIrrf},
     {debito:null, credito:9, valor:total, hist:histBanco, iniciaLote:null, flag:false, statusText:"OK (resgate de aplicação — baixa da aplicação)"},
   ];
 }
@@ -465,6 +509,20 @@ wireDropzone("extratoDrop","extratoFile", async (f,d)=>{
   document.getElementById("processBtn").disabled = !lancExtratoState;
 });
 
+let aplicExtratoState = null;
+wireDropzone("aplicDrop","aplicFile", async (f,d)=>{
+  const status = document.getElementById("aplicStatus");
+  status.classList.remove("hidden","err"); status.textContent = "Lendo PDF...";
+  try{
+    aplicExtratoState = await parseExtratoAplicacao(f);
+    markDropDone(d, `${f.name} (rendimento R$ ${fmtBRL(aplicExtratoState.rendimento)}, IRRF R$ ${fmtBRL(aplicExtratoState.totalIrrf)})`);
+    status.classList.add("hidden");
+  }catch(err){
+    status.classList.remove("hidden"); status.classList.add("err"); status.textContent = "Erro: " + err.message;
+    aplicExtratoState = null;
+  }
+});
+
 let lancRowsState = [];
 let recebimentosState = [];
 function processarLancamentos(){
@@ -472,9 +530,11 @@ function processarLancamentos(){
   const rows = [];
   const recebimentos = [];
   let excluidas = 0;
+  const qtdResgates = linhas.filter(isResgate).length;
   linhas.forEach(l=>{
     if(isResgate(l)){
-      buildResgateEntries(l).forEach(e=> rows.push({...e, data:l.data}));
+      const irrfAutomatico = (aplicExtratoState && aplicExtratoState.totalIrrf!=null && qtdResgates===1) ? aplicExtratoState.totalIrrf : null;
+      buildResgateEntries(l, irrfAutomatico).forEach(e=> rows.push({...e, data:l.data}));
       return;
     }
     const p = matchPadrao(l);
@@ -501,6 +561,15 @@ function processarLancamentos(){
     // Débito sem padrão cadastrado: só a conta banco preenchida, resto pra completar à mão.
     rows.push({data:l.data, debito:null, credito:CONTA_BANCO, valor:l.valor, hist:null, complemento:l.historico, iniciaLote:1, flag:true, statusText:"Sem padrão cadastrado — complete a outra conta à mão"});
   });
+  // Rendimento do período da aplicação financeira — não passa pela conta corrente, então não
+  // vem do extrato bancário; só é gerado quando o extrato de aplicação financeira foi
+  // importado, lançado no último dia útil do mês (data do "Saldo Atual" desse extrato).
+  if(aplicExtratoState && aplicExtratoState.rendimento!=null && aplicExtratoState.dataSaldoAtual){
+    const dt = aplicExtratoState.dataSaldoAtual;
+    const dataLancamento = ultimoDiaUtil(dt.y, dt.m);
+    const hist = `VALOR REF. RENDIMENTO DE APLICAÇÃO FINANCEIRA ${mesAnoLabel(dataLancamento,0)} - SICREDI`;
+    rows.push({data:dataLancamento, debito:9, credito:395, valor:aplicExtratoState.rendimento, hist, iniciaLote:1, flag:false, statusText:"OK (rendimento do período — lido do extrato de aplicação financeira, não passa pelo banco)"});
+  }
   lancRowsState = rows;
   recebimentosState = recebimentos;
   renderLancResult(rows, excluidas);
