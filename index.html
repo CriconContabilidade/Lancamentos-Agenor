@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lançamentos Agenor</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root{
+  --ink:#1A1A1A;
+  --ink-soft:#65656B;
+  --paper:#E7E6E2;
+  --paper-raised:#FFFFFF;
+  --rule:#D6D5D1;
+  --rule-strong:#A9A7A2;
+  --red:#A6392C;
+  --red-bg:#F6E1DC;
+  --green-ink:#1F5E3C;
+  --green-bg:#DEEEE3;
+  --amber:#8A6400;
+  --amber-bg:#FCEEA9;
+  --accent:#2B4C7E;
+  --accent-bg:#DDE6F2;
+  --shadow: 0 1px 2px rgba(0,0,0,0.06), 0 4px 14px rgba(0,0,0,0.06);
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'IBM Plex Sans',sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.app{max-width:1280px;margin:0 auto;padding:28px 20px 80px;}
+
+.topbar{padding-bottom:18px;margin-bottom:22px;border-bottom:2px solid var(--ink);display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;}
+.brand h1{font-family:'Source Serif 4',serif;font-size:26px;font-weight:800;margin:0 0 4px;letter-spacing:-0.01em;}
+.brand .sub{font-size:13px;color:var(--ink-soft);max-width:680px;}
+.backlink{font-size:12.5px;color:var(--ink-soft);text-decoration:none;border-bottom:1px dotted var(--ink-soft);}
+.backlink:hover{color:var(--ink);}
+.cricon-brand{display:flex;align-items:center;gap:8px;}
+.cricon-brand svg{width:28px;height:auto;flex-shrink:0;}
+.cricon-brand .cw{line-height:1.05;text-align:right;}
+.cricon-brand .cw .nm{font-family:'Source Serif 4',serif;font-style:italic;font-weight:700;font-size:14px;color:#5D4232;white-space:nowrap;}
+.cricon-brand .cw .tg{font-family:'IBM Plex Sans',sans-serif;font-size:9px;color:var(--ink-soft);letter-spacing:.02em;white-space:nowrap;}
+
+.card{background:var(--paper-raised);border:1.5px solid var(--ink);border-radius:6px;box-shadow:var(--shadow);padding:20px;margin-bottom:20px;}
+
+.dropzone{border:2px dashed var(--rule-strong);border-radius:6px;padding:28px 14px;text-align:center;cursor:pointer;transition:background .15s,border-color .15s;}
+.dropzone:hover,.dropzone.drag{background:rgba(0,0,0,0.03);border-color:var(--ink);}
+.dropzone .big{font-size:13.5px;font-weight:600;margin-bottom:4px;}
+.dropzone .small{font-size:11.5px;color:var(--ink-soft);}
+.dropzone.done{border-style:solid;border-color:var(--green-ink);background:var(--green-bg);}
+input[type=file]{display:none;}
+
+.field-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:14px;}
+.field label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);margin-bottom:4px;font-family:'IBM Plex Mono',monospace;}
+.field input,.field select{width:100%;padding:7px 9px;border:1.5px solid var(--rule-strong);border-radius:4px;font-size:13.5px;font-family:'IBM Plex Mono',monospace;background:var(--paper-raised);color:var(--ink);}
+.field input:focus,.field select:focus{outline:none;border-color:var(--ink);}
+
+.btn{padding:9px 16px;border-radius:4px;border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);cursor:pointer;font-weight:600;font-size:13.5px;transition:transform .08s ease,opacity .15s;font-family:'IBM Plex Sans',sans-serif;}
+.btn:hover{opacity:.88;}
+.btn:active{transform:translateY(1px);}
+.btn.ghost{background:transparent;color:var(--ink);}
+.btn.ghost:hover{background:rgba(0,0,0,0.06);}
+.btn.small{padding:5px 10px;font-size:12px;}
+.btn:disabled{opacity:.35;cursor:not-allowed;}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
+
+.status-line{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--ink-soft);margin-top:10px;white-space:pre-wrap;}
+.status-line.err{color:var(--red);}
+.status-line.ok{color:var(--green-ink);}
+
+.badge{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.03em;padding:2px 8px;border-radius:10px;font-weight:600;}
+.badge.ok{background:var(--green-bg);color:var(--green-ink);}
+.badge.warn{background:var(--amber-bg);color:var(--amber);}
+.badge.err{background:var(--red-bg);color:var(--red);}
+.badge.info{background:var(--accent-bg);color:var(--accent);}
+
+.summary-row{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0;font-size:13px;}
+.summary-row .item .k{color:var(--ink-soft);font-size:11px;text-transform:uppercase;letter-spacing:.03em;font-family:'IBM Plex Mono',monospace;}
+.summary-row .item .v{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:16px;}
+
+table.preview{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;}
+table.preview th{text-align:left;padding:7px 8px;border-bottom:1.5px solid var(--rule-strong);font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-soft);position:sticky;top:0;background:var(--paper-raised);white-space:nowrap;}
+table.preview th.sortable{cursor:pointer;user-select:none;}
+table.preview th.sortable:hover{color:var(--ink);}
+table.preview th.sortable .arrow{color:var(--accent);}
+.table-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+.table-toolbar input[type=search]{flex:1;max-width:320px;padding:7px 9px;border:1.5px solid var(--rule-strong);border-radius:4px;font-size:13px;font-family:'IBM Plex Sans',sans-serif;background:var(--paper-raised);color:var(--ink);}
+.table-toolbar input[type=search]:focus{outline:none;border-color:var(--ink);}
+.table-toolbar .count{font-size:11.5px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;white-space:nowrap;}
+table.preview td{padding:6px 8px;border-bottom:1px solid var(--rule);vertical-align:top;}
+table.preview td.num{text-align:right;font-family:'IBM Plex Mono',monospace;white-space:nowrap;}
+table.preview tr.flag{background:var(--amber-bg);}
+table.preview tr.info{opacity:.65;}
+.dropzone.small-drop{padding:16px;}
+.table-wrap{max-height:520px;overflow:auto;border:1px solid var(--rule);border-radius:4px;}
+.cell-input{font-family:'IBM Plex Mono',monospace;font-size:12px;padding:3px 5px;border:1.5px solid transparent;border-radius:3px;background:transparent;width:100%;min-width:70px;color:var(--ink);}
+.cell-input:hover{border-color:var(--rule-strong);}
+.cell-input:focus{outline:none;border-color:var(--ink);background:var(--paper-raised);}
+.cell-input.num{text-align:right;font-weight:600;}
+.cell-input.wide{min-width:190px;}
+td.cell{padding:2px 4px;}
+
+.hidden{display:none !important;}
+.section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin:0 0 12px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;}
+.help{font-size:12px;color:var(--ink-soft);line-height:1.5;margin-bottom:14px;}
+.help b{color:var(--ink);}
+footer{margin-top:30px;font-size:11.5px;color:var(--ink-soft);text-align:center;}
+code{background:var(--paper);padding:1px 5px;border-radius:3px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <h1>Lançamentos Agenor</h1>
+      <div class="sub">Lê o extrato bancário Sicredi da <b>Agenor Daufenbach Junior Advogados Associados</b> e gera os lançamentos contábeis pro Domínio — honorários da Cricon, integralização de capital, aplicação/resgate de fundos, custas processuais TJSC e distribuições de lucro aos sócios. Recebimentos de cliente (notas de serviço) não entram aqui — geram baixa na ferramenta <a href="https://criconcontabilidade.github.io/Baixas-Parcelas/" target="_blank">Baixas de Parcelas</a>, que já lê essa empresa sozinha. Tudo roda 100% local no navegador.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+      <a class="backlink" href="https://criconcontabilidade.github.io/Cricon-Ferramentas/" onclick="window.close(); setTimeout(function(){ location.href='https://criconcontabilidade.github.io/Cricon-Ferramentas/'; }, 250); return false;">← Hub de Ferramentas</a>
+      <div class="cricon-brand">
+        <svg viewBox="0 0 141 109" xmlns="http://www.w3.org/2000/svg"><path d="M 15.33 33.25 L 9.50 52.58 L 11.33 74.33 L 19.08 90.67 L 36.17 102.92 L 57.25 104.92 L 73.25 100.08 L 84.92 104.83 L 100.25 104.83 L 115.75 97.92 L 126.00 85.67 L 129.92 74.17 L 130.25 61.92 L 60.92 62.08 L 62.42 49.00 L 130.58 48.75 L 129.92 37.75 L 126.75 29.75 L 118.33 20.33 L 111.42 16.33 L 97.92 12.75 L 88.58 12.67 L 72.58 18.17 L 59.83 13.67 L 41.33 13.58 L 26.42 20.42 Z M 78.58 93.58 L 86.00 80.08 L 86.00 78.42 L 87.00 77.08 L 87.00 74.33 L 87.92 72.75 L 88.33 69.50 L 120.42 69.42 L 121.00 69.92 L 121.08 74.17 L 120.17 75.42 L 120.08 77.17 L 119.25 78.25 L 119.25 79.58 L 117.33 83.67 L 115.83 85.17 L 114.75 87.33 L 111.33 90.75 L 109.25 91.75 L 108.08 92.92 L 102.33 95.92 L 100.33 96.00 L 98.50 97.00 L 85.58 97.00 L 84.42 96.00 L 82.58 95.92 Z M 62.33 69.50 L 78.42 69.42 L 79.25 70.08 L 79.25 70.92 L 78.33 72.58 L 78.33 74.25 L 77.42 75.42 L 77.42 77.00 L 76.50 78.25 L 76.58 79.67 L 76.00 80.33 L 75.58 81.67 L 74.92 82.33 L 74.67 83.58 L 73.92 84.33 L 73.58 85.50 L 71.67 87.58 L 71.17 87.50 L 70.75 87.00 L 69.92 86.67 L 69.00 85.25 L 66.75 82.83 L 66.25 81.42 L 63.83 77.00 L 63.75 75.25 L 62.83 74.17 L 62.83 71.67 L 61.92 70.58 L 61.92 69.92 Z M 20.17 69.75 L 20.58 69.42 L 52.00 69.67 L 52.83 70.58 L 53.17 72.50 L 54.08 73.67 L 54.17 75.50 L 55.08 76.50 L 55.00 78.17 L 56.00 80.75 L 59.67 86.42 L 60.00 87.83 L 61.58 89.33 L 61.83 90.58 L 63.50 92.33 L 63.42 93.75 L 62.58 94.83 L 61.33 95.08 L 60.33 96.00 L 58.42 96.08 L 57.42 97.00 L 43.83 97.00 L 42.58 96.00 L 41.00 96.00 L 39.75 95.08 L 38.42 95.08 L 36.25 94.08 L 34.75 92.67 L 30.33 90.25 L 26.67 86.50 L 26.42 85.33 L 23.08 81.00 L 22.83 79.08 L 21.00 76.25 L 20.92 73.83 L 20.00 72.50 Z M 19.08 50.08 L 20.42 49.00 L 51.83 49.08 L 52.33 49.58 L 52.25 55.25 L 51.42 57.83 L 51.42 61.17 L 50.67 61.83 L 18.58 61.83 L 18.08 61.33 L 18.08 58.58 L 19.08 56.17 Z M 72.67 28.83 L 75.50 31.67 L 76.58 33.58 L 77.42 34.58 L 77.58 36.42 L 78.42 37.50 L 78.33 38.92 L 79.33 40.33 L 79.25 41.00 L 78.50 41.42 L 65.25 41.33 L 64.67 40.58 L 64.58 39.67 L 65.42 38.50 L 65.67 37.42 L 66.42 36.50 L 66.58 35.50 L 68.00 33.92 L 68.50 32.58 L 72.00 29.00 Z M 80.17 23.67 L 81.50 22.33 L 82.75 22.00 L 83.75 21.17 L 85.50 21.08 L 86.58 20.17 L 99.25 20.17 L 100.33 21.08 L 103.00 21.17 L 104.25 22.08 L 107.75 23.08 L 109.42 24.67 L 112.67 26.00 L 117.08 30.42 L 120.17 35.50 L 120.17 37.00 L 121.17 38.50 L 121.08 40.83 L 120.42 41.42 L 88.50 41.42 L 87.92 40.67 L 87.92 38.33 L 86.92 36.92 L 86.92 34.50 L 86.17 33.75 L 84.75 30.33 L 80.75 25.42 Z M 64.58 23.67 L 63.33 26.33 L 61.08 28.58 L 60.67 29.83 L 59.17 31.33 L 58.75 32.75 L 57.33 34.33 L 56.08 37.00 L 55.92 38.33 L 55.08 39.25 L 55.08 40.75 L 54.42 41.42 L 22.58 41.50 L 22.17 41.17 L 22.92 39.42 L 22.83 38.42 L 26.83 31.42 L 33.17 25.17 L 41.00 21.17 L 43.58 21.08 L 44.75 20.17 L 57.50 20.17 L 58.92 21.00 L 60.83 21.17 L 63.08 22.17 Z" fill="#5D4232" fill-rule="evenodd"/></svg>
+        <div class="cw"><div class="nm">Contabilidade Cricon</div><div class="tg">Contabilizando seu sucesso!</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== EXTRATO ===================== -->
+  <div class="card">
+    <div class="section-title">1. Extrato bancário Sicredi (PDF)</div>
+    <div class="dropzone" id="extratoDrop"><div class="big">Arraste o extrato bancário do mês aqui</div><div class="small">Internet Banking Sicredi — conta corrente 42799-3</div><input type="file" id="extratoFile" accept="application/pdf"></div>
+    <div id="extratoStatus" class="status-line hidden"></div>
+    <div class="field-row" style="margin-top:16px;">
+      <div class="field"><label>Código Emp. (Domínio)</label><input id="lancCodEmp" placeholder="opcional"></div>
+    </div>
+    <div class="btn-row"><button class="btn" id="processBtn" disabled onclick="processarLancamentos()">Processar</button></div>
+  </div>
+
+  <!-- ===================== RESULTADO ===================== -->
+  <div class="card hidden" id="resultCard"></div>
+  <div class="card hidden" id="recebimentosCard"></div>
+
+  <!-- ===================== CADASTRO DE PADRÕES ===================== -->
+  <div class="card">
+    <div class="section-title">Cadastro de Padrões (palavra-chave → contas)</div>
+    <div class="help">Cada linha do extrato é comparada contra as palavras-chave abaixo (ignora acento/caixa). Se só um lado (débito ou crédito) estiver fixo, a conta banco (<code>7</code>) preenche o outro lado sozinha, dependendo se o lançamento é débito ou crédito no extrato. O sentido "D"/"C" na coluna Direção restringe o padrão a só débitos ou só créditos (útil pro CNPJ do TJSC, que aparece nos dois sentidos por motivos diferentes). Padrões com lançamento automático acoplado (honorários da Cricon: pagamento + provisão) só são editáveis via JSON.</div>
+    <div class="table-wrap"><table class="preview" id="padroesTable"></table></div>
+    <div class="btn-row">
+      <button class="btn ghost small" onclick="addPadraoRow()">+ Novo padrão</button>
+      <button class="btn ghost small" onclick="togglePadroesJson()">Editar como JSON</button>
+    </div>
+    <div id="padroesJsonBox" class="hidden" style="margin-top:12px;">
+      <textarea id="padroesJsonArea" rows="14" style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:12px;padding:10px;border:1.5px solid var(--rule-strong);border-radius:4px;"></textarea>
+      <div class="btn-row"><button class="btn small" onclick="salvarPadroesJson()">Salvar JSON</button></div>
+      <div id="padroesJsonStatus" class="status-line hidden"></div>
+    </div>
+  </div>
+
+  <footer>Lançamentos Agenor · Cricon Contabilidade — uso interno</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const CONTA_BANCO = 7; // conta contábil do banco Sicredi (única conta corrente da empresa)
+
+/* =========================================================================
+   HELPERS: valores / datas / texto — mesmo comportamento já validado nas
+   outras ferramentas do Hub (Lançamentos Bari, Baixas de Parcelas)
+   ========================================================================= */
+function parseBRL(str){
+  if(str==null) return null;
+  str = String(str).trim();
+  if(str==="" || str==="-" || str==="–") return null;
+  const neg = /^-/.test(str) || /^\(.*\)$/.test(str);
+  str = str.replace(/[()\-]/g,"").replace(/R\$/g,"").replace(/\s+/g,"").replace(/\./g,"").replace(",",".").trim();
+  const n = parseFloat(str);
+  if(isNaN(n)) return null;
+  return neg ? -n : n;
+}
+function fmtBRL(n){
+  if(n==null || isNaN(n)) return "";
+  return n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function fmtValorTxt(n){
+  if(n==null || n==="" || isNaN(n)) return "0";
+  const r = Math.round(Number(n)*100)/100;
+  if(r === 0) return "0";
+  if(Number.isInteger(r)) return String(r);
+  return r.toFixed(2).replace(".",",");
+}
+function fmtDateBR(dt){ if(!dt) return ""; return `${String(dt.d).padStart(2,"0")}/${String(dt.m).padStart(2,"0")}/${dt.y}`; }
+function brParts(str){
+  const m = String(str||"").trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(!m) return null;
+  let y = parseInt(m[3]); if(y<100) y += 2000;
+  return {y, m:parseInt(m[2]), d:parseInt(m[1])};
+}
+function partsToDate(dt){ return new Date(Date.UTC(dt.y, dt.m-1, dt.d)); }
+function downloadTextAnsi(filename, content){
+  const bytes = new Uint8Array(content.length);
+  for(let i=0;i<content.length;i++){
+    const code = content.charCodeAt(i);
+    bytes[i] = code <= 0xFF ? code : 0x3F;
+  }
+  const blob = new Blob([bytes], {type:"text/plain"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function downloadXlsx(filename, rowsAoA, sheetName){
+  const ws = XLSX.utils.aoa_to_sheet(rowsAoA);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName||"Sheet1");
+  XLSX.writeFile(wb, filename);
+}
+function stripAccents(s){ return String(s??"").normalize("NFD").replace(/[̀-ͯ]/g,""); }
+function normalizeText(s){ return (s||"").toString().normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().trim(); }
+
+function wireDropzone(dropId, inputId, onFile){
+  const drop = document.getElementById(dropId);
+  const input = document.getElementById(inputId);
+  drop.addEventListener("click", ()=>input.click());
+  input.addEventListener("change", ()=>{ if(input.files[0]) onFile(input.files[0], drop); });
+  drop.addEventListener("dragover", e=>{ e.preventDefault(); drop.classList.add("drag"); });
+  drop.addEventListener("dragleave", ()=> drop.classList.remove("drag"));
+  drop.addEventListener("drop", e=>{
+    e.preventDefault(); drop.classList.remove("drag");
+    if(e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0], drop);
+  });
+}
+function markDropDone(drop, label){
+  drop.classList.add("done");
+  drop.querySelector(".big").textContent = "✓ " + label;
+}
+async function extractPdfPageLines(pdf, pageNum){
+  const page = await pdf.getPage(pageNum);
+  const content = await page.getTextContent();
+  const rows = {};
+  content.items.forEach(it=>{
+    const y = Math.round(it.transform[5]);
+    if(!rows[y]) rows[y] = [];
+    rows[y].push({x:it.transform[4], text:it.str});
+  });
+  const ys = Object.keys(rows).map(Number).sort((a,b)=>b-a);
+  return ys.map(y=> rows[y].sort((a,b)=>a.x-b.x).map(t=>t.text).join(" ").replace(/\s+/g," ").trim() ).filter(l=>l.length>0);
+}
+async function extractPdfAllLines(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+  const pages = [];
+  for(let p=1;p<=pdf.numPages;p++) pages.push(await extractPdfPageLines(pdf, p));
+  return pages;
+}
+
+function makeTableState(){ return {filter:"", sortCol:null, sortDir:1}; }
+function sortValue(v){ return v && typeof v==="object" && "y" in v ? partsToDate(v).getTime() : v; }
+function filterSortRows(rows, state, getSearchable){
+  let indexed = rows.map((row,idx)=>({row, idx}));
+  const needle = normalizeText((state.filter||"").trim());
+  if(needle) indexed = indexed.filter(({row})=> getSearchable(row).some(v=>normalizeText(String(v??"")).includes(needle)));
+  if(state.sortCol){
+    indexed.sort((a,b)=>{
+      const va = sortValue(a.row[state.sortCol]), vb = sortValue(b.row[state.sortCol]);
+      if(va==null && vb==null) return 0;
+      if(va==null) return 1;
+      if(vb==null) return -1;
+      if(typeof va === "number" && typeof vb === "number") return (va-vb)*state.sortDir;
+      return String(va).localeCompare(String(vb), "pt-BR", {numeric:true})*state.sortDir;
+    });
+  }
+  return indexed;
+}
+function toggleSort(state, col, rerenderFn){
+  if(state.sortCol===col){ state.sortDir *= -1; } else { state.sortCol = col; state.sortDir = 1; }
+  rerenderFn();
+}
+function sortTh(stateVarName, state, col, label, rerenderFnName){
+  const arrow = state.sortCol===col ? `<span class="arrow">${state.sortDir===1?"▲":"▼"}</span>` : "";
+  return `<th class="sortable" onclick="toggleSort(${stateVarName},'${col}',${rerenderFnName})">${label} ${arrow}</th>`;
+}
+
+/* =========================================================================
+   EXTRATO SICREDI — cada linha já sai como "DD/MM/AAAA Descrição Valor Saldo"
+   depois de agrupar por Y; sinal negativo no Valor = débito (saída).
+   ========================================================================= */
+async function parseExtratoSicredi(file){
+  const pages = await extractPdfAllLines(file);
+  const allLines = pages.flat();
+  const RE = /^(\d{2})\/(\d{2})\/(\d{4})\s+(.+?)\s+(-?\d{1,3}(?:\.\d{3})*,\d{2})\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s*$/;
+  const linhas = [];
+  allLines.forEach(line=>{
+    const m = line.match(RE);
+    if(!m) return;
+    const [, dd, mm, yyyy, desc, valorStr] = m;
+    const valorSigned = parseBRL(valorStr);
+    if(/^SALDO/i.test(desc.trim())) return;
+    linhas.push({
+      data:{y:parseInt(yyyy), m:parseInt(mm), d:parseInt(dd)},
+      historico: desc.trim(),
+      valor: Math.abs(valorSigned),
+      tipo: valorSigned < 0 ? "D" : "C",
+    });
+  });
+  return linhas;
+}
+
+/* =========================================================================
+   HISTÓRICOS CALCULADOS — o mês citado depende da data do lançamento, não
+   pode ficar fixo no cadastro (senão fica desatualizado mês que vem).
+   ========================================================================= */
+const MESES = ["JANEIRO","FEVEREIRO","MARÇO","ABRIL","MAIO","JUNHO","JULHO","AGOSTO","SETEMBRO","OUTUBRO","NOVEMBRO","DEZEMBRO"];
+function mesAnoLabel(dt, offsetMeses){
+  let mm = dt.m + offsetMeses, yy = dt.y;
+  while(mm < 1){ mm += 12; yy -= 1; }
+  while(mm > 12){ mm -= 12; yy += 1; }
+  return `${MESES[mm-1]}/${yy}`;
+}
+const HIST_FUNCOES = {
+  // Honorários da Cricon são pagos em D+1 mês (pagos em agosto = referentes a julho).
+  honorariosPagto(l){ return `PAGAMENTO REF. HONORÁRIOS CONTÁBEIS ${mesAnoLabel(l.data,-1)} - CRICON CONTABILIDADE`; },
+  honorariosProvisao(l){ return `VALOR REF. HONORÁRIOS CONTÁBEIS ${mesAnoLabel(l.data,-1)} - CRICON CONTABILIDADE`; },
+  // Integralização de capital cita o mês do próprio débito.
+  capitalMesAtual(l){ return `VALOR REF. INTEGRALIZAÇÃO DE CAPITAL ${mesAnoLabel(l.data,0)} - SICREDI`; },
+};
+function resolveHist(p, l){ return p.histFn ? (HIST_FUNCOES[p.histFn] ? HIST_FUNCOES[p.histFn](l) : null) : p.hist; }
+
+/* =========================================================================
+   CADASTRO DE PADRÕES
+   ========================================================================= */
+const PADROES_SEED = [
+  // PJ Bank = honorários contábeis da Cricon: paga a fatura (D222 C7) e, no mesmo lote,
+  // lança a provisão da despesa do mês (D335 C222) — sempre os dois juntos, mesmo dia.
+  {keywords:["PJBANK"], debito:222, credito:null, histFn:"honorariosPagto", ignorar:false,
+    companion:{debito:335, credito:222, histFn:"honorariosProvisao"}},
+  // Pago no próprio sistema da Receita Federal — não gera lançamento aqui.
+  {keywords:["RECEITA FEDERAL"], debito:null, credito:null, hist:"", ignorar:true},
+  {keywords:["PLANO INT CAPITAL"], debito:76, credito:null, histFn:"capitalMesAtual", ignorar:false},
+  {keywords:["APLIC. FINANC. FUNDOS","APLIC FINANC FUNDOS","APLICACAO FINANC FUNDOS"], debito:9, credito:null, hist:"VALOR REF. APLICAÇÃO FINANCEIRA SICREDI", ignorar:false},
+  // CNPJ do TJSC aparece nos dois sentidos: TED recebida (honorários de cliente — vira baixa
+  // de serviço em outra ferramenta, por isso NÃO tem padrão aqui) e boleto pago (custas
+  // processuais) — por isso este padrão só se aplica a débitos.
+  {keywords:["83845701000159"], direcao:"D", debito:340, credito:null, hist:"PAGAMENTO REF. CUSTAS PROCESSUAIS - TJSC", ignorar:false},
+  // Distribuições de lucro aos sócios — conta de cada um conforme o cadastro contábil.
+  {keywords:["AGENOR DAUFENBACH"], direcao:"D", debito:241, credito:null, hist:"PAGAMENTO REF. ADIANTAMENTO DE LUCROS - AGENOR DAUFENBACH JUNIOR", ignorar:false},
+  {keywords:["DANIELA DE OLIVEIRA"], direcao:"D", debito:231, credito:null, hist:"PAGAMENTO REF. ADIANTAMENTO DE LUCROS - DANIELA DE OLIVEIRA", ignorar:false},
+  {keywords:["GABRIELA ROVARIS"], direcao:"D", debito:251, credito:null, hist:"PAGAMENTO REF. ADIANTAMENTO DE LUCROS - GABRIELA ROVARIS", ignorar:false},
+  {keywords:["MAIARA MAFIOLETTI"], direcao:"D", debito:504, credito:null, hist:"PAGAMENTO REF. ADIANTAMENTO DE LUCROS - MAIARA MAFIOLETTI MACARINI", ignorar:false},
+];
+function loadPadroes(){
+  const raw = localStorage.getItem("agenor_lancamentos_padroes");
+  const salvo = raw ? JSON.parse(raw) : [];
+  const chaves = new Set(salvo.map(p=>(p.keywords||[]).join("|")));
+  const novos = PADROES_SEED.filter(p=>!chaves.has((p.keywords||[]).join("|"))).map(p=>({...p}));
+  return [...salvo, ...novos];
+}
+function savePadroes(list){ localStorage.setItem("agenor_lancamentos_padroes", JSON.stringify(list)); }
+let padroesDB = loadPadroes();
+function renderPadroesTable(){
+  const tbl = document.getElementById("padroesTable");
+  tbl.innerHTML = `<thead><tr>
+      <th>Palavras-chave (separadas por vírgula)</th><th>Direção</th><th>Débito</th><th>Crédito</th><th>Histórico</th><th>Ignorar</th><th></th>
+    </tr></thead><tbody>` +
+    padroesDB.map((p,i)=>{
+      if(p.companion){
+        return `<tr>
+          <td class="cell"><input class="cell-input wide" value="${(p.keywords||[]).join(', ')}" onchange="updatePadraoKeywords(${i},this.value)"></td>
+          <td colspan="4" style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink-soft);">Com lançamento automático acoplado (D${p.debito??''} C${p.credito??''} + D${p.companion.debito??''} C${p.companion.credito??''}) — edite via JSON</td>
+          <td class="cell" style="text-align:center"><input type="checkbox" ${p.ignorar?'checked':''} onchange="updatePadrao(${i},'ignorar',this.checked)"></td>
+          <td><button class="btn small ghost" onclick="removePadraoRow(${i})">✕</button></td>
+        </tr>`;
+      }
+      const histCell = p.histFn
+        ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);" title="Calculado a partir da data de cada lançamento — não editável aqui, só via JSON">Calculado (${p.histFn})</span>`
+        : `<input class="cell-input wide" value="${p.hist||''}" onchange="updatePadrao(${i},'hist',this.value)">`;
+      return `<tr>
+      <td class="cell"><input class="cell-input wide" value="${(p.keywords||[]).join(', ')}" onchange="updatePadraoKeywords(${i},this.value)"></td>
+      <td class="cell"><input class="cell-input" style="width:50px" value="${p.direcao||''}" onchange="updatePadrao(${i},'direcao',this.value)" title="D = só débito, C = só crédito, vazio = os dois"></td>
+      <td class="cell"><input class="cell-input" style="width:70px" value="${p.debito??''}" onchange="updatePadrao(${i},'debito',this.value)"></td>
+      <td class="cell"><input class="cell-input" style="width:70px" value="${p.credito??''}" onchange="updatePadrao(${i},'credito',this.value)"></td>
+      <td class="cell">${histCell}</td>
+      <td class="cell" style="text-align:center"><input type="checkbox" ${p.ignorar?'checked':''} onchange="updatePadrao(${i},'ignorar',this.checked)"></td>
+      <td><button class="btn small ghost" onclick="removePadraoRow(${i})">✕</button></td>
+    </tr>`;
+    }).join("") + `</tbody>`;
+  document.getElementById("padroesJsonArea").value = JSON.stringify(padroesDB, null, 2);
+}
+function updatePadrao(i, field, val){
+  if(field==="debito" || field==="credito"){ padroesDB[i][field] = String(val).trim()===""?null:Number(val); }
+  else if(field==="ignorar"){ padroesDB[i][field] = val; }
+  else if(field==="direcao"){ padroesDB[i][field] = String(val).trim().toUpperCase()||null; }
+  else { padroesDB[i][field] = val; }
+  savePadroes(padroesDB);
+}
+function updatePadraoKeywords(i, val){ padroesDB[i].keywords = val.split(",").map(s=>s.trim()).filter(Boolean); savePadroes(padroesDB); }
+function addPadraoRow(){ padroesDB.push({keywords:[],debito:null,credito:null,hist:"",ignorar:false}); savePadroes(padroesDB); renderPadroesTable(); }
+function removePadraoRow(i){ padroesDB.splice(i,1); savePadroes(padroesDB); renderPadroesTable(); }
+function togglePadroesJson(){ document.getElementById("padroesJsonBox").classList.toggle("hidden"); }
+function salvarPadroesJson(){
+  const status = document.getElementById("padroesJsonStatus");
+  status.classList.remove("hidden","err","ok");
+  try{
+    const parsed = JSON.parse(document.getElementById("padroesJsonArea").value);
+    if(!Array.isArray(parsed)) throw new Error("Precisa ser uma lista de padrões.");
+    padroesDB = parsed;
+    savePadroes(padroesDB);
+    renderPadroesTable();
+    status.classList.add("ok"); status.textContent = "Cadastro de padrões salvo.";
+  }catch(err){ status.classList.add("err"); status.textContent = "JSON inválido: " + err.message; }
+}
+function matchPadrao(l){
+  const norm = normalizeText(l.historico);
+  for(const p of padroesDB){
+    if(p.direcao && p.direcao !== l.tipo) continue;
+    for(const kw of (p.keywords||[])){
+      if(kw && norm.includes(normalizeText(kw))) return p;
+    }
+  }
+  return null;
+}
+
+/* =========================================================================
+   RESGATE DE APLICAÇÃO FINANCEIRA — lançamento de partidas múltiplas:
+     D 7   VALOR REF. RESGATE DE APLICAÇÃO FINANCEIRA - SICREDI   (valor líquido no extrato)
+     D 385 VALOR REF. IRRF SOBRE RESGATE DE APLICAÇÃO FINANCEIRA  (varia todo mês — pergunta na hora)
+     C 9   VALOR REF. RESGATE DE APLICAÇÃO FINANCEIRA - SICREDI   (soma dos dois débitos)
+   ========================================================================= */
+function isResgate(l){ return normalizeText(l.historico).includes("RESGATE APLIC"); }
+function buildResgateEntries(l){
+  const bancoVal = l.valor;
+  const irrfStr = window.prompt(`Resgate de aplicação financeira em ${fmtDateBR(l.data)}, valor líquido R$ ${fmtBRL(bancoVal)}.\n\nQual o IRRF sobre esse resgate (ver extrato de aplicação/resgate Sicredi)? Deixe 0 se não houver.`, "0");
+  const irrfVal = Math.round((parseBRL(irrfStr) || 0)*100)/100;
+  const total = Math.round((bancoVal + irrfVal)*100)/100;
+  const histBanco = "VALOR REF. RESGATE DE APLICAÇÃO FINANCEIRA - SICREDI";
+  const histIrrf = "VALOR REF. IRRF SOBRE RESGATE DE APLICAÇÃO FINANCEIRA - SICREDI";
+  return [
+    {debito:CONTA_BANCO, credito:null, valor:bancoVal, hist:histBanco, iniciaLote:1, flag:false, statusText:"OK (resgate de aplicação — perna do banco)"},
+    {debito:385, credito:null, valor:irrfVal, hist:histIrrf, iniciaLote:null, flag:irrfVal===0, statusText: irrfVal===0 ? "Confira se realmente não houve IRRF nesse resgate" : "OK (resgate de aplicação — IRRF)"},
+    {debito:null, credito:9, valor:total, hist:histBanco, iniciaLote:null, flag:false, statusText:"OK (resgate de aplicação — baixa da aplicação)"},
+  ];
+}
+
+/* =========================================================================
+   PROCESSAMENTO
+   ========================================================================= */
+let lancExtratoState = null;
+wireDropzone("extratoDrop","extratoFile", async (f,d)=>{
+  const status = document.getElementById("extratoStatus");
+  status.classList.remove("hidden","err"); status.textContent = "Lendo PDF...";
+  try{
+    lancExtratoState = await parseExtratoSicredi(f);
+    if(!lancExtratoState.length) throw new Error("Não encontrei nenhum lançamento nesse extrato.");
+    markDropDone(d, `${f.name} (${lancExtratoState.length} lançamento(s) no extrato)`);
+    status.classList.add("hidden");
+  }catch(err){
+    status.classList.remove("hidden"); status.classList.add("err"); status.textContent = "Erro: " + err.message;
+    lancExtratoState = null;
+  }
+  document.getElementById("processBtn").disabled = !lancExtratoState;
+});
+
+let lancRowsState = [];
+let recebimentosState = [];
+function processarLancamentos(){
+  const linhas = lancExtratoState;
+  const rows = [];
+  const recebimentos = [];
+  let excluidas = 0;
+  linhas.forEach(l=>{
+    if(isResgate(l)){
+      buildResgateEntries(l).forEach(e=> rows.push({...e, data:l.data}));
+      return;
+    }
+    const p = matchPadrao(l);
+    if(p && p.ignorar){ excluidas++; return; }
+    if(p){
+      let d = p.debito, c = p.credito;
+      if(d==null && l.tipo==="C") d = CONTA_BANCO;
+      if(c==null && l.tipo==="D") c = CONTA_BANCO;
+      const matched = d!=null && c!=null;
+      const hist = resolveHist(p, l);
+      rows.push({data:l.data, debito:d, credito:c, valor:l.valor, hist:hist||null, complemento: hist?null:l.historico, iniciaLote:1, flag:!matched, statusText: matched?"OK (padrão cadastrado)":"Padrão parcial — só a conta banco foi preenchida"});
+      if(p.companion){
+        const histC = resolveHist(p.companion, l) || p.companion.hist;
+        rows.push({data:l.data, debito:p.companion.debito??null, credito:p.companion.credito??null, valor:l.valor, hist:histC||null, complemento:null, iniciaLote:null, flag:false, statusText:"OK (lançamento automático — sempre acompanha o padrão acima)"});
+      }
+      return;
+    }
+    // Recebimento de cliente (crédito não reconhecido por nenhum padrão) — vira baixa de
+    // notas de serviço em outra ferramenta, não um lançamento contábil aqui.
+    if(l.tipo === "C"){
+      recebimentos.push(l);
+      return;
+    }
+    // Débito sem padrão cadastrado: só a conta banco preenchida, resto pra completar à mão.
+    rows.push({data:l.data, debito:null, credito:CONTA_BANCO, valor:l.valor, hist:null, complemento:l.historico, iniciaLote:1, flag:true, statusText:"Sem padrão cadastrado — complete a outra conta à mão"});
+  });
+  lancRowsState = rows;
+  recebimentosState = recebimentos;
+  renderLancResult(rows, excluidas);
+  renderRecebimentos(recebimentos);
+}
+
+let lancTableState = makeTableState();
+let lancExcluidasState = 0;
+function renderLancResult(rows, excluidas){
+  document.getElementById("resultCard").classList.remove("hidden");
+  lancTableState = makeTableState();
+  lancExcluidasState = excluidas;
+  renderLancTable();
+}
+function renderLancTable(){
+  const box = document.getElementById("resultCard");
+  const rows = lancRowsState;
+  const nFlag = rows.filter(r=>r.flag).length;
+  const indexed = filterSortRows(rows, lancTableState, r=>[r.debito,r.credito,r.hist,r.complemento]);
+  let html = `<div class="section-title">Lançamentos — lanctos.txt</div>
+  <div class="summary-row">
+    <div class="item"><div class="k">Linhas</div><div class="v">${rows.length}</div></div>
+    <div class="item"><div class="k">Pra conferir</div><div class="v">${nFlag}</div></div>
+    <div class="item"><div class="k">Ignoradas (Receita Federal etc.)</div><div class="v">${lancExcluidasState}</div></div>
+  </div>
+  <div class="help">Linhas em amarelo faltam completar (conta em branco, ou o IRRF do resgate ficou zerado — confira). "Inicia Lote" marca onde cada lançamento composto começa; linhas do mesmo lote têm o mesmo histórico e ficam juntas — não reordene com o filtro antes de exportar.</div>
+  <div class="table-toolbar"><input type="search" value="${lancTableState.filter}" placeholder="Filtrar por conta ou histórico..." oninput="lancTableState.filter=this.value; renderLancTable();"><span class="count">${indexed.length===rows.length?`${rows.length} linha(s)`:`${indexed.length} de ${rows.length}`}</span></div>
+  <div class="table-wrap"><table class="preview"><thead><tr>
+    ${sortTh('lancTableState',lancTableState,'data','Data','renderLancTable')}
+    ${sortTh('lancTableState',lancTableState,'debito','Débito','renderLancTable')}
+    ${sortTh('lancTableState',lancTableState,'credito','Crédito','renderLancTable')}
+    ${sortTh('lancTableState',lancTableState,'valor','Valor','renderLancTable')}
+    <th>Complemento</th><th>Lote</th><th>Status</th>
+  </tr></thead><tbody>`;
+  indexed.forEach(({row:r, idx:i})=>{
+    html += `<tr class="${r.flag?'flag':''}">
+      <td class="cell"><input class="cell-input" value="${fmtDateBR(r.data)}" onchange="updateLancRow(${i},'data',this.value)"></td>
+      <td class="cell"><input class="cell-input" style="width:60px" value="${r.debito??''}" onchange="updateLancRow(${i},'debito',this.value)"></td>
+      <td class="cell"><input class="cell-input" style="width:60px" value="${r.credito??''}" onchange="updateLancRow(${i},'credito',this.value)"></td>
+      <td class="cell"><input class="cell-input num" value="${fmtBRL(r.valor)}" onchange="updateLancRow(${i},'valor',this.value)"></td>
+      <td class="cell"><input class="cell-input wide" value="${r.hist||r.complemento||''}" onchange="updateLancRow(${i},'complemento',this.value)"></td>
+      <td style="text-align:center">${r.iniciaLote?'●':''}</td>
+      <td>${r.statusText||''}</td>
+    </tr>`;
+  });
+  html += `</tbody></table></div>
+  <div class="btn-row">
+    <button class="btn" onclick="downloadLancXlsx()">Baixar lancamentos.xlsx</button>
+    <button class="btn ghost" onclick="downloadLancTxt()">Baixar lanctos.txt</button>
+  </div>`;
+  box.innerHTML = html;
+}
+function updateLancRow(i, field, val){
+  const r = lancRowsState[i];
+  if(field==="data"){ const dt=brParts(val); if(dt) r.data=dt; }
+  else if(field==="valor"){ const n=parseBRL(val); if(n!=null) r.valor=n; }
+  else if(field==="debito" || field==="credito"){ r[field] = String(val).trim()===""?null:val.trim(); }
+  else if(field==="complemento"){ r.complemento = val; r.hist = null; }
+  if(r.debito!=null && r.credito!=null && (r.hist || r.complemento)) r.flag = false;
+}
+const LANC_HEADER = ["Data","Débito","Crédito","Valor","Cód. Hist.","Complemento Histórico","Inicia Lote","Código Emp.","Centro de Custo Débito","Centro de Custo Crédito"];
+function lancRowArray(r){
+  const codEmp = document.getElementById("lancCodEmp").value.trim();
+  return [fmtDateBR(r.data), r.debito??"", r.credito??"", r.valor, "", r.hist||r.complemento||"", r.iniciaLote??"", codEmp, "", ""];
+}
+function downloadLancXlsx(){
+  downloadXlsx("lancamentos.xlsx", [LANC_HEADER, ...lancRowsState.map(lancRowArray)], "Lancamentos");
+}
+function downloadLancTxt(){
+  const pendentes = lancRowsState.filter(r=>r.flag);
+  if(pendentes.length){
+    if(!confirm(`${pendentes.length} linha(s) ainda marcada(s) pra conferir (conta em branco ou IRRF do resgate zerado). Gerar mesmo assim?`)) return;
+  }
+  const lines = lancRowsState.map(r=> lancRowArray(r).map((v,i)=> i===3 ? fmtValorTxt(v) : (i===5 ? stripAccents(v) : v)).join(";"));
+  downloadTextAnsi("lanctos.txt", lines.join("\r\n") + "\r\n");
+}
+
+function renderRecebimentos(recebimentos){
+  const box = document.getElementById("recebimentosCard");
+  if(!recebimentos.length){ box.classList.add("hidden"); box.innerHTML = ""; return; }
+  box.classList.remove("hidden");
+  let html = `<div class="section-title">Recebimentos identificados (${recebimentos.length}) — não entram nesse arquivo</div>
+  <div class="help">Créditos no extrato que não bateram com nenhum padrão cadastrado — normalmente são recebimentos de nota de serviço/honorários de cliente. Gere a baixa deles na ferramenta <a href="https://criconcontabilidade.github.io/Baixas-Parcelas/" target="_blank">Baixas de Parcelas</a> (modelo "Serviços"), que lê o Contas a Receber e o mesmo extrato sozinha.</div>
+  <div class="table-wrap"><table class="preview"><thead><tr><th>Data</th><th>Histórico</th><th>Valor</th></tr></thead><tbody>`;
+  recebimentos.forEach(l=>{
+    html += `<tr class="info"><td>${fmtDateBR(l.data)}</td><td>${l.historico}</td><td class="num">${fmtBRL(l.valor)}</td></tr>`;
+  });
+  html += `</tbody></table></div>`;
+  box.innerHTML = html;
+}
+
+renderPadroesTable();
+</script>
+</body>
+</html>
